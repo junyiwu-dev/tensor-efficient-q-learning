@@ -59,6 +59,7 @@ class Discretizer:
             self.n_states = new_n_states
             self.dimensions = np.concatenate((self.n_states, self.n_actions))
 
+
     def get_state_index(self, state):
         state = np.clip(state, a_min=self.min_points_states, a_max=self.max_points_states)
         scaling = (state - self.min_points_states) / self.range_states
@@ -408,6 +409,8 @@ class PrioritizedReplayBuffer(ReplayBuffer):
             res.append(idx)
         return res
 
+
+    # Adjusted to return importance weights and idxes
     def sample_batch(self, batch_size, beta):
         """Sample a batch of experiences.
         compared to ReplayBuffer.sample

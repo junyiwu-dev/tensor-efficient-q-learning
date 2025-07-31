@@ -98,7 +98,7 @@ class CustomContinuousCartPoleEnv(gym.Env):
             self.steps_beyond_done += 1
             reward = 0.0 - theta**2 - 0.1*theta_dot**2 - 10*action**2
 
-        print(f"State: {self.state}, Action: {action}, Reward: {reward}, Done: {done}")
+        # print(f"State: {self.state}, Action: {action}, Reward: {reward}, Done: {done}")
 
         return np.array(self.state), reward, done, {}
 
@@ -157,4 +157,3 @@ class CustomContinuousCartPoleEnv(gym.Env):
     def close(self):
         if self.viewer:
             self.viewer.close()
-

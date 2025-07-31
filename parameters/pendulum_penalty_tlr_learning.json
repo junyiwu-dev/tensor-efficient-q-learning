@@ -1,0 +1,20 @@
+{
+    "type": "penalty-tlr",
+    "min_points_states": [-1, -5],
+    "max_points_states": [1, 5],
+    "bucket_states": [20, 20],
+    "min_points_actions": [-2],
+    "max_points_actions": [2],
+    "bucket_actions": [10],
+    "episodes": 10000,
+    "max_steps": 100,
+    "epsilon": 0,
+    "alpha": 0.005,
+    "gamma": 0.9,
+    "decay": 0.999999,
+    "k": 10,
+    "bias": 0.0,
+    "discrete_action": false,
+    "lambda_penalty": 1.0,
+    "epsilon_penalty": 1e-6
+}

@@ -1,0 +1,19 @@
+{
+  "type": "masked-tlr-model",
+  "bucket_states": [15, 15],
+  "bucket_actions": [10],
+  "min_points_states": [-3.14, -8],
+  "max_points_states": [3.14, 8],
+  "min_points_actions": [-2],
+  "max_points_actions": [2],
+  "episodes": 10000,
+  "max_steps": 200,
+  "epsilon": 0.3,
+  "alpha": 0.01,
+  "decay": 0.9998,
+  "decay_alpha": 0.9999,
+  "gamma": 0.99,
+  "k": 15,
+  "bias": 0.5,
+  "mask_strategy": "multi"
+}
