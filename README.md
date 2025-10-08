@@ -89,8 +89,7 @@ Building upon the baseline, TEQL introduces:
 
 1. **Frequency-Based Penalty Mechanism**: Prevents overfitting to frequently visited state-action pairs (λ-regularization in objective function)
 2. **Error-Uncertainty Guided Exploration (EUGE)**: Novel exploration strategy combining approximation errors with UCB
-3. **Theoretical Analysis**: Regret bound O(√(d_eff·T)) with formal proofs
-4. **Comprehensive Experimental Evaluation**: Ablation studies and sensitivity analyses demonstrating improvements
+3. **Experimental Evaluation**: Ablation studies and sensitivity analyses demonstrating improvements
 
 ## Reproducing Results
 
