@@ -2,8 +2,6 @@ import os
 import json
 import shutil
 from tqdm import tqdm
-import matplotlib.pyplot as plt
-import matplotlib
 import numpy as np
 
 from src.environments.pendulum import CustomPendulumEnv
@@ -62,103 +60,7 @@ def collect_results_from_backup(env_prefix):
             
     return all_results
 
-def plot_metrics(ax_steps, ax_rewards, results, title, run_greedy_frequency=10):
-    if not results:
-        return
-    
-    try:
-        training_steps_original = []
-        training_steps_convergent = []
-        training_rewards_original = []
-        training_rewards_convergent = []
-        greedy_steps_original = []
-        greedy_steps_convergent = []
-        greedy_rewards_original = []
-        greedy_rewards_convergent = []
-        
-        for data in results:
-            if all(k in data[0] for k in ['training_steps', 'training_cumulative_reward', 'greedy_steps', 'greedy_cumulative_reward']):
-                training_steps_original.append(data[0]['training_steps'])
-                training_rewards_original.append(data[0]['training_cumulative_reward'])
-                greedy_steps_original.append(data[0]['greedy_steps'])
-                greedy_rewards_original.append(data[0]['greedy_cumulative_reward'])
-            if all(k in data[1] for k in ['training_steps', 'training_cumulative_reward', 'greedy_steps', 'greedy_cumulative_reward']):
-                training_steps_convergent.append(data[1]['training_steps'])
-                training_rewards_convergent.append(data[1]['training_cumulative_reward'])
-                greedy_steps_convergent.append(data[1]['greedy_steps'])
-                greedy_rewards_convergent.append(data[1]['greedy_cumulative_reward'])
 
-        if training_steps_original and training_steps_convergent:
-            # Convert to numpy arrays
-            training_steps_original = np.array(training_steps_original)
-            training_steps_convergent = np.array(training_steps_convergent)
-            training_rewards_original = np.array(training_rewards_original)
-            training_rewards_convergent = np.array(training_rewards_convergent)
-            greedy_steps_original = np.array(greedy_steps_original)
-            greedy_steps_convergent = np.array(greedy_steps_convergent)
-            greedy_rewards_original = np.array(greedy_rewards_original)
-            greedy_rewards_convergent = np.array(greedy_rewards_convergent)
-            
-            # x-axis: training mode is every episode, greedy mode is every run_greedy_frequency episodes
-            episodes = np.arange(1, training_steps_original.shape[1] + 1)
-            greedy_episodes = np.arange(run_greedy_frequency, training_steps_original.shape[1] + 1, run_greedy_frequency)
-            
-            # Plot steps
-            ax_steps.plot(episodes, np.mean(training_steps_original, axis=0), label='Original TLR Train Steps', color='blue', linestyle='--')
-            ax_steps.plot(episodes, np.mean(training_steps_convergent, axis=0), label='Convergent TLR Train Steps', color='red', linestyle='--')
-            ax_steps.plot(greedy_episodes, np.mean(greedy_steps_original, axis=0), label='Original TLR Greedy Steps', color='blue')
-            ax_steps.plot(greedy_episodes, np.mean(greedy_steps_convergent, axis=0), label='Convergent TLR Greedy Steps', color='red')
-            ax_steps.fill_between(episodes,
-                               np.mean(training_steps_original, axis=0) - np.std(training_steps_original, axis=0),
-                               np.mean(training_steps_original, axis=0) + np.std(training_steps_original, axis=0),
-                               alpha=0.2, color='blue')
-            ax_steps.fill_between(episodes,
-                               np.mean(training_steps_convergent, axis=0) - np.std(training_steps_convergent, axis=0),
-                               np.mean(training_steps_convergent, axis=0) + np.std(training_steps_convergent, axis=0),
-                               alpha=0.2, color='red')
-            ax_steps.fill_between(greedy_episodes,
-                               np.mean(greedy_steps_original, axis=0) - np.std(greedy_steps_original, axis=0),
-                               np.mean(greedy_steps_original, axis=0) + np.std(greedy_steps_original, axis=0),
-                               alpha=0.2, color='blue')
-            ax_steps.fill_between(greedy_episodes,
-                               np.mean(greedy_steps_convergent, axis=0) - np.std(greedy_steps_convergent, axis=0),
-                               np.mean(greedy_steps_convergent, axis=0) + np.std(greedy_steps_convergent, axis=0),
-                               alpha=0.2, color='red')
-            ax_steps.set_title(f'{title} - Steps per Episode')
-            ax_steps.set_xlabel("Episodes")
-            ax_steps.set_ylabel("Number of Steps")
-            ax_steps.legend()
-            ax_steps.grid(True)
-
-            # Plot rewards
-            ax_rewards.plot(episodes, np.mean(training_rewards_original, axis=0), label='Original TLR Train Rewards', color='blue', linestyle='--')
-            ax_rewards.plot(episodes, np.mean(training_rewards_convergent, axis=0), label='Convergent TLR Train Rewards', color='red', linestyle='--')
-            ax_rewards.plot(greedy_episodes, np.mean(greedy_rewards_original, axis=0), label='Original TLR Greedy Rewards', color='blue')
-            ax_rewards.plot(greedy_episodes, np.mean(greedy_rewards_convergent, axis=0), label='Convergent TLR Greedy Rewards', color='red')
-            ax_rewards.fill_between(episodes,
-                                 np.mean(training_rewards_original, axis=0) - np.std(training_rewards_original, axis=0),
-                                 np.mean(training_rewards_original, axis=0) + np.std(training_rewards_original, axis=0),
-                                 alpha=0.2, color='blue')
-            ax_rewards.fill_between(episodes,
-                                 np.mean(training_rewards_convergent, axis=0) - np.std(training_rewards_convergent, axis=0),
-                                 np.mean(training_rewards_convergent, axis=0) + np.std(training_rewards_convergent, axis=0),
-                                 alpha=0.2, color='red')
-            ax_rewards.fill_between(greedy_episodes,
-                                 np.mean(greedy_rewards_original, axis=0) - np.std(greedy_rewards_original, axis=0),
-                                 np.mean(greedy_rewards_original, axis=0) + np.std(greedy_rewards_original, axis=0),
-                                 alpha=0.2, color='blue')
-            ax_rewards.fill_between(greedy_episodes,
-                                 np.mean(greedy_rewards_convergent, axis=0) - np.std(greedy_rewards_convergent, axis=0),
-                                 np.mean(greedy_rewards_convergent, axis=0) + np.std(greedy_rewards_convergent, axis=0),
-                                 alpha=0.2, color='red')
-            ax_rewards.set_title(f'{title} - Rewards per Episode')
-            ax_rewards.set_xlabel("Episodes")
-            ax_rewards.set_ylabel("Cumulative Reward")
-            ax_rewards.legend()
-            ax_rewards.grid(True)
-            
-    except Exception as e:
-        print(f"Error plotting metrics for {title}: {str(e)}")
 
 def run_iteration(iteration):
     backup_and_clear_results(iteration)
@@ -169,7 +71,7 @@ def run_iteration(iteration):
     experiment = Experiment('pendulum_original_tlr_learning.json', env_pendulum)
     experiment.run_experiments(window=30)
     
-    print(f"Running Convergent TLR...")
+    print(f"Running TEQL...")
     experiment = Experiment('pendulum_convergent_tlr_learning.json', env_pendulum)
     experiment.run_experiments(window=30)
 
@@ -178,7 +80,7 @@ def run_iteration(iteration):
     experiment = Experiment('cartpole_original_tlr_learning.json', env_cartpole)
     experiment.run_experiments(window=50)
     
-    print(f"Running Convergent TLR...")
+    print(f"Running TEQL...")
     experiment = Experiment('cartpole_convergent_tlr_learning.json', env_cartpole)
     experiment.run_experiments(window=50)
     
@@ -193,19 +95,6 @@ def run_iteration(iteration):
                 dst_path = os.path.join(backup_dir, result_file)
                 if os.path.exists(src_path):
                     shutil.move(src_path, dst_path)
-
-def setup_plotting_style():
-    plt.style.use('default')
-    matplotlib.rcParams.update({
-        'font.size': 12,
-        'font.family': 'serif',
-        'axes.labelsize': 12,
-        'axes.grid': True,
-        'grid.linestyle': '--',
-        'grid.alpha': 0.5,
-        'lines.linewidth': 2,
-        'figure.figsize': (15, 12)
-    })
 
 def main():
     os.makedirs('results', exist_ok=True)
@@ -224,16 +113,8 @@ def main():
     pendulum_results = collect_results_from_backup('pendulum')
     cartpole_results = collect_results_from_backup('cartpole')
     
+    # Save collected results to final_results.json
     if pendulum_results or cartpole_results:
-        setup_plotting_style()
-        fig, ((ax1_steps, ax1_rewards), (ax2_steps, ax2_rewards)) = plt.subplots(2, 2, figsize=(15, 12))
-        
-        plot_metrics(ax1_steps, ax1_rewards, pendulum_results, 'Pendulum', run_greedy_frequency=10)
-        plot_metrics(ax2_steps, ax2_rewards, cartpole_results, 'Cartpole', run_greedy_frequency=10)
-        
-        plt.tight_layout()
-        fig.savefig('aggregated_tlr_comparison_results.png', dpi=300, bbox_inches='tight')
-        
         with open('final_results.json', 'w') as f:
             json.dump({
                 'pendulum': pendulum_results,
