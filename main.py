@@ -8,12 +8,11 @@ import numpy as np
 
 from src.environments.pendulum import CustomPendulumEnv
 from src.environments.cartpole import CustomContinuousCartPoleEnv
-from src.experiments.experiment_TLR_Qerror import TLRExperiment
+from src.experiments.experiment_runner import Experiment
 from src.utils.utils import OOMFormatter
 
 env_pendulum = CustomPendulumEnv()
 env_cartpole = CustomContinuousCartPoleEnv()
-N_NODES = 1
 N_ITERATIONS = 100
 
 EXPERIMENT_CONFIGS = {
@@ -90,7 +89,7 @@ def plot_metrics(ax_steps, ax_rewards, results, title, run_greedy_frequency=10):
                 greedy_rewards_convergent.append(data[1]['greedy_cumulative_reward'])
 
         if training_steps_original and training_steps_convergent:
-            # 转换为 numpy 数组
+            # Convert to numpy arrays
             training_steps_original = np.array(training_steps_original)
             training_steps_convergent = np.array(training_steps_convergent)
             training_rewards_original = np.array(training_rewards_original)
@@ -100,11 +99,11 @@ def plot_metrics(ax_steps, ax_rewards, results, title, run_greedy_frequency=10):
             greedy_rewards_original = np.array(greedy_rewards_original)
             greedy_rewards_convergent = np.array(greedy_rewards_convergent)
             
-            # x 轴：训练模式为每个 episode，贪婪模式为每 run_greedy_frequency 个 episode
+            # x-axis: training mode is every episode, greedy mode is every run_greedy_frequency episodes
             episodes = np.arange(1, training_steps_original.shape[1] + 1)
             greedy_episodes = np.arange(run_greedy_frequency, training_steps_original.shape[1] + 1, run_greedy_frequency)
             
-            # 绘制 steps
+            # Plot steps
             ax_steps.plot(episodes, np.mean(training_steps_original, axis=0), label='Original TLR Train Steps', color='blue', linestyle='--')
             ax_steps.plot(episodes, np.mean(training_steps_convergent, axis=0), label='Convergent TLR Train Steps', color='red', linestyle='--')
             ax_steps.plot(greedy_episodes, np.mean(greedy_steps_original, axis=0), label='Original TLR Greedy Steps', color='blue')
@@ -131,7 +130,7 @@ def plot_metrics(ax_steps, ax_rewards, results, title, run_greedy_frequency=10):
             ax_steps.legend()
             ax_steps.grid(True)
 
-            # 绘制 rewards
+            # Plot rewards
             ax_rewards.plot(episodes, np.mean(training_rewards_original, axis=0), label='Original TLR Train Rewards', color='blue', linestyle='--')
             ax_rewards.plot(episodes, np.mean(training_rewards_convergent, axis=0), label='Convergent TLR Train Rewards', color='red', linestyle='--')
             ax_rewards.plot(greedy_episodes, np.mean(greedy_rewards_original, axis=0), label='Original TLR Greedy Rewards', color='blue')
@@ -167,20 +166,20 @@ def run_iteration(iteration):
     
     print("\nRunning Pendulum experiments:")
     print(f"Running Original TLR...")
-    experiment = TLRExperiment('pendulum_original_tlr_learning.json', env_pendulum, N_NODES)
+    experiment = Experiment('pendulum_original_tlr_learning.json', env_pendulum)
     experiment.run_experiments(window=30)
     
     print(f"Running Convergent TLR...")
-    experiment = TLRExperiment('pendulum_convergent_tlr_learning.json', env_pendulum, N_NODES)
+    experiment = Experiment('pendulum_convergent_tlr_learning.json', env_pendulum)
     experiment.run_experiments(window=30)
 
     print("\nRunning Cartpole experiments:")
     print(f"Running Original TLR...")
-    experiment = TLRExperiment('cartpole_original_tlr_learning.json', env_cartpole, N_NODES)
+    experiment = Experiment('cartpole_original_tlr_learning.json', env_cartpole)
     experiment.run_experiments(window=50)
     
     print(f"Running Convergent TLR...")
-    experiment = TLRExperiment('cartpole_convergent_tlr_learning.json', env_cartpole, N_NODES)
+    experiment = Experiment('cartpole_convergent_tlr_learning.json', env_cartpole)
     experiment.run_experiments(window=50)
     
     backup_dir = f'results_backup/iteration_{iteration}'
@@ -211,7 +210,6 @@ def setup_plotting_style():
 def main():
     os.makedirs('results', exist_ok=True)
     os.makedirs('results_backup', exist_ok=True)
-    # 移除了 q_error_records 目录的创建 - 不再保存Q_error历史记录
     
     start_iteration = 0
     while os.path.exists(f'results_backup/iteration_{start_iteration}'):
@@ -242,7 +240,6 @@ def main():
                 'cartpole': cartpole_results
             }, f)
     
-    print("\nExperiments completed. Results saved.") # 移除了关于Q_error records的提示 - 不再保存历史记录
-
+    print("\nExperiments completed. Results saved.") 
 if __name__ == "__main__":
     main()
