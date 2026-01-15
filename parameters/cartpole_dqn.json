@@ -1,0 +1,23 @@
+{
+    "type": "dqn",
+    "min_points_states": [-4.8, -0.5, -0.42, -0.9],
+    "max_points_states": [4.8, 0.5, 0.42, 0.9],
+    "bucket_states": [10, 10, 20, 20],
+    "min_points_actions": [-1],
+    "max_points_actions": [1],
+    "bucket_actions": [10],
+    "discrete_action": false,
+    "episodes": 10000,
+    "max_steps": 100,
+    "arch": [46],
+    "lr": 0.001,
+    "gamma": 0.9,
+    "epsilon": 1.0,
+    "epsilon_decay": 0.999999,
+    "min_epsilon": 0.01,
+    "batch_size": 32,
+    "buffer_size": 100000,
+    "warmup_steps": 500,
+    "update_freq": 1,
+    "target_update_freq": 100
+}

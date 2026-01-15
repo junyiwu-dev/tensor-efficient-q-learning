@@ -1,0 +1,36 @@
+cat > .gitignore << EOF
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Results and backups
+results/
+results_backup*/
+nn_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Temporary files
+*.tmp
+*.bak
+*.log
+
+# Large data files
+*.pkl
+*.npy
+*.npz
+EOF

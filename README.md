@@ -1,196 +1,281 @@
 # Tensor-Efficient Q-Learning (TEQL)
 
-This repository contains the implementation and experimental code for the paper "Tensor-Efficient High-Dimensional Q-learning".
+## Supplementary Code for Technometrics Submission
 
-## Abstract
+**Paper Title:** Tensor-Efficient High-Dimensional Q-Learning
 
-TEQL is a reinforcement learning framework that combines low-rank tensor decomposition with improved exploration strategies to achieve superior sample efficiency in high-dimensional state-action spaces. The method introduces: (1) a frequency-based penalty mechanism to prevent overfitting to frequently visited state-action pairs, and (2) an Error-Uncertainty Guided Exploration (EUGE) strategy that integrates approximation errors with upper confidence bounds.
+This repository contains the complete implementation and reproducible code for all experimental results presented in the paper.
 
-## Requirements
+---
+
+## Quick Start: Reproducing Paper Results
+
+### Minimal Reproduction (Recommended for Review)
+
+The following commands reproduce key figures from the paper in approximately **2-3 hours** on a standard laptop:
+
+```bash
+# Step 1: Install dependencies
+pip install numpy torch tensorly gymnasium matplotlib scipy pandas seaborn
+
+# Step 2: Run comparison experiment (5 iterations for quick verification)
+python main_comparison.py --env cartpole pendulum --model teql tlr --iterations 5
+
+# Step 3: Generate Figure 2 (Learning Curves)
+python plot_baselines.py --env cartpole pendulum --model teql tlr
+```
+
+**Output:** `figures/comparison_all_algorithms.pdf` corresponds to **Figure 2** in the paper.
+
+---
+
+## Complete Reproduction Guide
+
+### System Requirements
+
+| Requirement | Specification |
+|-------------|---------------|
+| Python | 3.8 or higher |
+| RAM | 8 GB minimum |
+| Storage | 2 GB for results |
+| OS | Linux, macOS, or Windows |
 
 ### Software Dependencies
-- Python 3.8+
-- NumPy >= 1.20.0
-- Matplotlib >= 3.3.0
-- Seaborn >= 0.11.0
-- SciPy >= 1.7.0
-- Pandas >= 1.3.0
-- TensorLy >= 0.7.0
-- PyTorch >= 1.9.0
-- Gymnasium (OpenAI Gym) >= 0.26.0
-- Pathos >= 0.2.8
+
+```
+numpy>=1.20.0
+torch>=1.9.0
+tensorly>=0.7.0
+gymnasium>=0.26.0
+matplotlib>=3.3.0
+scipy>=1.7.0
+pandas>=1.3.0
+seaborn>=0.11.0
+highway-env>=1.8.0  # Optional: for Highway environment
+```
 
 ### Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/junyiwu-dev/tensor-efficient-q-learning.git
-cd teql
-
-# Create virtual environment
+# Create and activate virtual environment
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install dependencies
-pip install -r requirements.txt
+pip install numpy torch tensorly gymnasium matplotlib scipy pandas seaborn
+
+# Optional: Install highway-env for Highway experiments
+pip install highway-env
 ```
 
-## Project Structure
+---
 
-```
-teql/
-├── src/
-│   ├── algorithms/
-│   │   ├── tlr_original.py      # Original Tensor Low-Rank (TLR) baseline
-│   │   ├── teql.py              # TEQL implementation with frequency penalty and EUGE
-│   │   └── q_learning.py        # Standard Q-learning for comparison
-│   ├── environments/
-│   │   ├── pendulum.py          # Modified Pendulum environment
-│   │   └── cartpole.py          # Continuous CartPole environment
-│   ├── experiments/
-│   │   └── experiment_runner.py # Experiment orchestration
-│   └── utils/
-│       └── utils.py              # Discretizer and utility functions
-├── parameters/               # JSON configuration files for experiments
-├── results/                 # Output directory for experimental results
-├── figures/                 # Generated plots and visualizations
-├── visualization/           # Plotting and analysis scripts
-│   ├── plot_tlr_vs_teql.py
-│   ├── plot_ablation_study.py
-│   ├── convergence_analysis.py
-│   ├── performance_comparison.py
-│   └── discretization_sensitivity.py
-└── main.py                  # Main execution script
-```
+## Reproducing Specific Figures and Tables
 
-## Baseline Implementation Acknowledgment
+### Figure 2: Main Algorithm Comparison (TEQL vs Baselines)
 
-This implementation builds upon the tensor low-rank reinforcement learning framework introduced in:
+**Description:** Learning curves comparing TEQL, TLR, LoRa-VI, DQN, and SAC on CartPole and Pendulum.
 
-**Rozada, S., Paternain, S., & Marques, A. G. (2024). Tensor and matrix low-rank value-function approximation in reinforcement learning. IEEE Transactions on Signal Processing, 72, 1634-1649.**
-
-- Original paper: [IEEE TSP](https://ieeexplore.ieee.org/document/10478283)
-- Original code repository: [https://github.com/sergiorozada12/tensor-low-rank-rl](https://github.com/sergiorozada12/tensor-low-rank-rl)
-
-### Components from the Original Implementation
-
-The following components are adapted from Rozada et al.'s implementation:
-
-1. **Baseline TLR Algorithm** (`src/algorithms/tlr_original.py`): The original Tensor Low-Rank learning algorithm with block coordinate descent
-2. **Environment Modifications**: 
-   - Modified Pendulum environment with bounded angles and custom reward function
-   - Continuous action CartPole environment
-3. **Discretization Framework** (`src/utils/utils.py`): State-action space discretization utilities
-4. **Tensor Decomposition Structure**: CP decomposition framework for Q-function approximation
-
-### Our Contributions
-
-Building upon the baseline, TEQL introduces:
-
-1. **Frequency-Based Penalty Mechanism**: Prevents overfitting to frequently visited state-action pairs (λ-regularization in objective function)
-2. **Error-Uncertainty Guided Exploration (EUGE)**: Novel exploration strategy combining approximation errors with UCB
-3. **Theoretical Analysis**: Regret bound O(√(d_eff·T)) with formal proofs
-4. **Comprehensive Experimental Evaluation**: Ablation studies and sensitivity analyses demonstrating improvements
-
-## Reproducing Results
-
-### 1. Main Comparison (TEQL vs TLR)
-
-Run the primary comparison experiment:
-
+**Commands:**
 ```bash
-python main.py
+# Full reproduction (30 iterations, ~10 hours)
+python main_comparison.py --env cartpole pendulum --model teql tlr lora-vi dqn sac --iterations 30
+
+# Generate plot
+python plot_baselines.py --env cartpole pendulum --model teql tlr lora-vi dqn sac
 ```
 
-This executes 100 iterations comparing TEQL with the original TLR baseline on both Pendulum and CartPole environments. Results are saved in `results_backup/`.
+**Output:** `figures/comparison_all_algorithms.pdf`
 
-### 2. Ablation Study (Frequency Penalty)
+**Estimated Time:** 
+- Quick version (5 iterations): ~2 hours
+- Full version (30 iterations): ~10 hours
 
-Evaluate the impact of the frequency penalty mechanism:
+---
 
+### Figure 3: Ablation Study (Effect of λ Regularization)
+
+**Description:** Comparison of TEQL with λ=0 versus λ>0 demonstrating the impact of frequency-based penalty.
+
+**Commands:**
 ```bash
-python run_ablation_study.py
+# Run ablation experiments
+python main_comparison.py --env cartpole pendulum --model teql --iterations 30
+
+# Generate ablation plots
+python ablation.py
 ```
 
-This compares TEQL with and without the frequency penalty term (λ = 0.01 vs λ = 0).
+**Output:** 
+- `figures/ablation_curves.pdf` - Learning curves
+- `figures/ablation_boxplot.pdf` - Final performance distribution
 
-### 3. Discretization Sensitivity Analysis
+**Estimated Time:** ~4 hours
 
-Test robustness across different discretization granularities:
+---
 
+### Figure 4: Discretization Sensitivity Analysis
+
+**Description:** Performance across different discretization granularities (very_coarse to very_fine).
+
+**Commands:**
 ```bash
-python run_sensitivity_analysis.py
+# Run TEQL sensitivity analysis
+python sensitivity_analysis.py --env cartpole pendulum --iterations 30
+
+# Run TLR sensitivity analysis (for comparison)
+python sensitivity_analysis_TLR.py --env cartpole pendulum --iterations 30
+
+# Generate sensitivity plots
+python plot_sensitivity.py --env cartpole pendulum
+python plot_sensitivity_tlr_vs_teql.py
 ```
 
-Evaluates five discretization levels from very coarse (256 bins) to very fine (32,000 bins) for Pendulum, and (6,400 to 12,800,000 bins) for CartPole.
+**Output:**
+- `figures/sensitivity_analysis.pdf` - TEQL across discretization levels
+- `figures/sensitivity_tlr_vs_teql.pdf` - TLR vs TEQL comparison
 
-### 4. Generate Visualizations
+**Estimated Time:** ~8 hours
 
-After running experiments, generate all figures:
+---
 
+### Table 1: Final Performance Statistics
+
+**Description:** Mean and standard deviation of final cumulative rewards.
+
+**Commands:**
 ```bash
-# Individual visualization scripts
-python visualization/plot_tlr_vs_teql.py
-python visualization/plot_ablation_study.py
-python visualization/convergence_analysis.py
-python visualization/performance_comparison.py
-python visualization/discretization_sensitivity.py
+# Generate comprehensive analysis with statistics
+python comprehensive_analysis_plots.py
 ```
 
-Generated figures are saved in `figures/` directory as PDF files.
+**Output:** 
+- `figures/final_performance_statistics.txt` - Numerical results
+- Console output with formatted statistics table
 
-## Configuration
+---
 
-Experiment parameters are defined in JSON files within the `parameters/` directory. Key parameters include:
+## File Descriptions
 
-- `episodes`: Number of training episodes (default: 10,000)
-- `max_steps`: Maximum steps per episode (default: 100)
-- `epsilon`: Initial exploration rate
-- `alpha`: Learning rate (default: 0.005)
-- `gamma`: Discount factor (default: 0.9)
-- `k`: Tensor decomposition rank (default: 10)
-- `lambda_penalty`: Frequency penalty weight (default: 0.01)
-- `c`: Exploration constant for EUGE (default: 2.0)
+### Core Algorithms
 
-### Example Configuration (pendulum_convergent_tlr_learning.json):
+| File | Description | Paper Reference |
+|------|-------------|-----------------|
+| `teql.py` | **TEQL** - Proposed method with frequency penalty and EUGE exploration | Section 3 |
+| `tlr_original.py` | **TLR** - Tensor Low-Rank baseline (Rozada et al., 2024) | Section 5.1 |
+| `lora_vi.py` | **LoRa-VI** - Low-Rank Value Iteration baseline | Section 5.1 |
+| `dqn.py` | **DQN** - Deep Q-Network baseline | Section 5.1 |
+| `sac.py` | **SAC** - Soft Actor-Critic baseline | Section 5.1 |
+| `q_learning.py` | Standard tabular Q-Learning | Appendix |
 
-```json
-{
-    "type": "convergent-tlr",
-    "bucket_states": [20, 20],
-    "bucket_actions": [10],
-    "episodes": 10000,
-    "max_steps": 100,
-    "epsilon": 1.0,
-    "alpha": 0.005,
-    "gamma": 0.9,
-    "k": 10,
-    "lambda_penalty": 0.01,
-    "c": 1.0
-}
+### Environments
+
+| File | Description |
+|------|-------------|
+| `cartpole.py` | Continuous CartPole with custom reward function |
+| `pendulum.py` | Modified Pendulum with bounded angles |
+| `highway_wrapper.py` | Highway driving environment wrapper |
+| `mountaincar.py` | Continuous Mountain Car environment |
+
+### Experiment Scripts
+
+| File | Description | Reproduces |
+|------|-------------|------------|
+| `main_comparison.py` | Main experiment runner for algorithm comparison | Figure 2 |
+| `ablation.py` | Ablation study for λ regularization | Figure 3 |
+| `sensitivity_analysis.py` | TEQL discretization sensitivity | Figure 4 |
+| `sensitivity_analysis_TLR.py` | TLR discretization sensitivity | Figure 4 |
+| `comprehensive_analysis_plots.py` | Statistical analysis and box plots | Table 1 |
+
+### Visualization Scripts
+
+| File | Description |
+|------|-------------|
+| `plot_baselines.py` | Multi-algorithm comparison plots |
+| `plot_sensitivity.py` | Sensitivity analysis visualization |
+| `plot_sensitivity_tlr_vs_teql.py` | TLR vs TEQL comparison plots |
+| `plot_two_env.py` | Two-environment comparison layout |
+
+---
+
+## Algorithm Parameters
+
+Key hyperparameters used in experiments (see paper Section 5.2):
+
+| Parameter | Symbol | Default Value | Description |
+|-----------|--------|---------------|-------------|
+| Episodes | T | 10,000 | Number of training episodes |
+| Max steps | H | 100 | Maximum steps per episode |
+| Learning rate | α | 0.005 | Step size for updates |
+| Discount factor | γ | 0.9 | Future reward discount |
+| Tensor rank | k | 10 | CP decomposition rank |
+| Frequency penalty | λ | 1e-5 | Regularization weight |
+| UCB constant | c | 1.0 | Exploration-exploitation balance |
+| Initial ε | ε₀ | 1.0 | Initial exploration rate |
+
+---
+
+## Expected Output Structure
+
+After running experiments, results are organized as:
+
+```
+├── results_backup/
+│   ├── iteration_0/
+│   │   ├── cartpole_convergent_tlr_learning.json  # TEQL results
+│   │   ├── cartpole_original_tlr_learning.json    # TLR results
+│   │   ├── cartpole_dqn.json                      # DQN results
+│   │   └── ...
+│   ├── iteration_1/
+│   └── ...
+├── figures/
+│   ├── comparison_all_algorithms.pdf              # Figure 2
+│   ├── ablation_curves.pdf                        # Figure 3a
+│   ├── ablation_boxplot.pdf                       # Figure 3b
+│   ├── sensitivity_analysis.pdf                   # Figure 4a
+│   └── sensitivity_tlr_vs_teql.pdf                # Figure 4b
 ```
 
-## Key Algorithm Components
+---
 
-### 1. Low-Rank Tensor Q-Function Update
+## Verification Checklist
 
-The Q-function is approximated as a rank-R tensor using CP decomposition:
-- Located in `src/algorithms/teql.py`, method `update_q_matrix()`
-- Implements block coordinate descent with frequency-based penalty
+To verify successful reproduction:
 
-### 2. Error-Uncertainty Guided Exploration (EUGE)
+- [ ] `figures/comparison_all_algorithms.pdf` shows TEQL outperforming baselines
+- [ ] TEQL achieves higher final rewards than TLR on both environments
+- [ ] Ablation study shows λ>0 improves stability over λ=0
+- [ ] Sensitivity analysis shows robustness across discretization levels
 
-Action selection mechanism combining approximation error with UCB:
-- Located in `src/algorithms/teql.py`, method `choose_action()`
-- Computes EU value: EU_t(s,a) = Q̂(s,a) + c·[Q_error(s,a) + √(log N_total/N(s,a))]
+---
+
+## Troubleshooting
+
+**Issue:** `ModuleNotFoundError: No module named 'highway_env'`
+**Solution:** Highway environment is optional. Install with `pip install highway-env` or skip highway experiments.
+
+**Issue:** Slow execution
+**Solution:** Reduce iterations: `--iterations 5` for quick verification.
+
+**Issue:** Memory error
+**Solution:** Run environments separately: `--env cartpole` then `--env pendulum`.
+
+---
+
+## Baseline Acknowledgment
+
+This implementation builds upon the tensor low-rank RL framework from:
+
+> Rozada, S., Paternain, S., & Marques, A. G. (2024). Tensor and matrix low-rank value-function approximation in reinforcement learning. *IEEE Transactions on Signal Processing*, 72, 1634-1649.
+
+---
 
 ## License
 
-This project is licensed under the MIT License.
+MIT License
+
+---
 
 ## Contact
 
-For questions or issues, please contact:
-- Junyi Wu (junyiwu@uw.edu)
-
-Department of Industrial & System Engineering, University of Washington
+For questions regarding code reproduction, please contact the corresponding author.

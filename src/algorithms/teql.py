@@ -18,7 +18,7 @@ class TensorEfficientQL:
         gamma,
         k,
         decay=1.0,      
-        decay_alpha=1.0,
+        decay_alpha=1.0,  
         init_ord=1,
         min_epsilon=0.0,  
         bias=0.0,
@@ -26,8 +26,11 @@ class TensorEfficientQL:
         convergence_threshold=0.01,
         max_inner_iterations=5,
         ucb_c=1.0,       
-        lambda_penalty=0.01,  
-        epsilon_penalty=1e-6  
+        lambda_penalty=1e-5,
+        epsilon_penalty=1e-4,  
+        tau_start = 1.0,
+        tau_end = 0.05, 
+        tau_decay_episodes = 5000
     ):
         self.env = env
         self.discretizer = discretizer
@@ -47,6 +50,9 @@ class TensorEfficientQL:
         self.lambda_penalty = lambda_penalty
         self.epsilon_penalty = epsilon_penalty
         self.current_episode = 0
+        self.tau_start = tau_start
+        self.tau_end = tau_end 
+        self.tau_decay_episodes = tau_decay_episodes  
 
         self.factors = [(np.random.rand(dim, self.k) - bias) * init_ord for dim in self.discretizer.dimensions]
         self.factor_indices = np.arange(len(self.factors))
@@ -63,23 +69,67 @@ class TensorEfficientQL:
         self.greedy_cumulative_reward = []
         self.action_history = []
         self.state_history = []
+        # Print all hyperparameters
+        self._print_hyperparameters()
+
+    def _print_hyperparameters(self):
+        """Print all hyperparameter configurations"""
+        print("\n" + "="*70)
+        print("TEQL Hyperparameters Configuration")
+        print("="*70)
+        print(f"Environment Parameters:")
+        print(f"  episodes:             {self.episodes}")
+        print(f"  max_steps:            {self.max_steps}")
+        print(f"\nRL Core Parameters:")
+        print(f"  epsilon (initial):    {self.epsilon}")
+        print(f"  min_epsilon:          {self.min_epsilon}")
+        print(f"  alpha (learning rate):{self.alpha}")
+        print(f"  gamma (discount):     {self.gamma}")
+        print(f"  decay (epsilon):      {self.decay}")
+        print(f"  decay_alpha:          {self.decay_alpha}")
+        print(f"\nTensor Decomposition:")
+        print(f"  k (rank):             {self.k}")
+        print(f"  normalize_columns:    {self.normalize_columns}")
+        print(f"\nConvergence Control:")
+        print(f"  convergence_threshold:{self.convergence_threshold}")
+        print(f"  max_inner_iterations: {self.max_inner_iterations}")
+        print(f"\nExploration (EUGE):")
+        print(f"  ucb_c:                {self.ucb_c}")
+        print(f"\nRegularization:")
+        print(f"  lambda_penalty:       {self.lambda_penalty}")
+        print(f"  epsilon_penalty:      {self.epsilon_penalty}")
+        print(f"\nDiscretization:")
+        print(f"  state dimensions:     {self.discretizer.n_states}")
+        print(f"  action dimensions:    {self.discretizer.n_actions}")
+        print(f"  total tensor shape:   {self.discretizer.dimensions}")
+        print("="*70 + "\n")
 
     def get_random_action(self):
-        return np.random.uniform(self.discretizer.min_points_actions, self.discretizer.max_points_actions)
+        """Same as TLR: use environment's action_space to sample random actions"""
+        return self.env.action_space.sample()
 
     def get_greedy_action(self, state):
+        """Same as TLR greedy strategy, supports discrete and continuous actions"""
         state_idx = self.discretizer.get_state_index(state)
         q_simplified = self.get_q_from_state_idx(state_idx).reshape(self.discretizer.n_actions)
         action_idx = np.unravel_index(np.argmax(q_simplified), q_simplified.shape)
+
+        # Discrete action: return integer index directly; Continuous action: map back to actual action via discretizer
+        if getattr(self.discretizer, "discrete_action", False):
+            return action_idx[0]
         return self.discretizer.get_action_from_index(action_idx)
 
     def get_q_from_state_idx(self, state_idx):
+        """Use the same Khatri-Rao expansion order and computation method as TLR"""
         state_value = np.ones(self.k)
         for idx, factor in enumerate(self.factors[:len(state_idx)]):
-            factor_row = factor[state_idx[idx], :]
-            state_value *= factor_row
-        action_khatri = tl.tenalg.khatri_rao(self.factors[len(state_idx):])
-        action_state = np.dot(state_value, action_khatri.T)
+            state_value *= factor[state_idx[idx], :]
+
+        # Key point: explicitly specify reverse=False to ensure action dimension order is consistent with TLR
+        action_khatri = tl.tenalg.khatri_rao(self.factors[len(state_idx):], reverse=False)
+
+        # Same matrix operation form as TLR
+        action_state = np.sum(state_value * action_khatri, axis=1)
         return action_state
 
     def get_q_from_state_action_idx(self, state_idx, action_idx):
@@ -88,13 +138,12 @@ class TensorEfficientQL:
         for idx, factor in enumerate(self.factors):
             q_value *= factor[indices[idx], :]
         return np.sum(q_value)
-
+    
     def choose_action(self, state):
   
         if np.random.random() < self.epsilon:
             return self.get_random_action()
 
-   
         state_idx = self.discretizer.get_state_index(state)
         
         if self.discretizer.discrete_action:
@@ -119,7 +168,8 @@ class TensorEfficientQL:
         chosen_action_idx = np.argmax(ucb_scores)
         chosen_action = possible_actions[chosen_action_idx]
         return self.discretizer.get_action_from_index(chosen_action)
-
+    
+    
     def normalize(self):
         n_factors = len(self.factors)
         power_denominator = (n_factors - 1) / n_factors
@@ -132,22 +182,25 @@ class TensorEfficientQL:
             self.factors[i] *= scaler
 
     def update_q_matrix(self, state, action, state_prime, reward, done):
+        """Update low-rank Q matrix.
+        - When lambda_penalty==0 and max_inner_iterations==1: equivalent to TLR;
+        - Otherwise: use TEQL iterative update with optional penalty.
+        """
         state_idx = self.discretizer.get_state_index(state)
         state_prime_idx = self.discretizer.get_state_index(state_prime)
         action_idx = self.discretizer.get_action_index(action)
 
-        q_next = np.max(self.get_q_from_state_idx(state_prime_idx)) if not done else 0
+        q_next = np.max(self.get_q_from_state_idx(state_prime_idx)) if not done else 0.0
         target_q = reward + self.gamma * q_next
 
+        tensor_indices = state_idx + action_idx
         q_before = self.get_q_from_state_action_idx(state_idx, action_idx)
 
-        tensor_indices = state_idx + action_idx
-        iteration = 0
-        q_prev = q_before
-
-        
         n_sa = self.N[tensor_indices]
         penalty_weight = self.lambda_penalty / (n_sa + self.epsilon_penalty)
+
+        iteration = 0
+        q_prev = q_before
 
         while iteration < self.max_inner_iterations:
             new_factors = [factor.copy() for factor in self.factors]
@@ -156,12 +209,19 @@ class TensorEfficientQL:
                 for non_factor_idx in self.non_factor_indices[factor_idx]:
                     grad_factor *= self.factors[non_factor_idx][tensor_indices[non_factor_idx], :]
 
-                
+                grad_norm = np.linalg.norm(grad_factor)
+                if grad_norm == 0.0:
+                    continue
+
                 q_current = self.get_q_from_state_action_idx(state_idx, action_idx)
                 error_signal = target_q - q_current
-                error_update = -error_signal * grad_factor / np.linalg.norm(grad_factor)
 
-                encouragement_update = penalty_weight * grad_factor / np.linalg.norm(grad_factor)
+                error_update = -error_signal * grad_factor / grad_norm
+
+                if self.lambda_penalty != 0.0:
+                    encouragement_update = penalty_weight * grad_factor / grad_norm
+                else:
+                    encouragement_update = 0.0
 
                 update = error_update - encouragement_update
                 new_factors[factor_idx][tensor_indices[factor_idx], :] -= self.alpha * update
@@ -175,9 +235,6 @@ class TensorEfficientQL:
                 break
             q_prev = q_new
             iteration += 1
-
-        if self.current_episode % 100 == 0:
-            print(f"Episode {self.current_episode}, Iterations to converge: {iteration}")
 
         q_after = self.get_q_from_state_action_idx(state_idx, action_idx)
         self.Q_error[tensor_indices] = q_before - q_after
@@ -203,6 +260,9 @@ class TensorEfficientQL:
             if isinstance(info, dict) and 'terminal_observation' in info:
                 done = done[0] if isinstance(done, tuple) else done
 
+            # Convert reward to scalar if it's an array (for Pendulum compatibility)
+            if isinstance(reward, np.ndarray):
+                reward = float(reward.item()) if reward.size == 1 else float(reward)
             cumulative_reward += reward
             if len(state_prime.shape) > 1:
                 state_prime = state_prime.flatten()
@@ -246,21 +306,33 @@ class TensorEfficientQL:
         return n_steps, cumulative_reward
 
     def train(self, run_greedy_frequency=None, q_error_callback=None):
-        self.training_steps = []
         self.training_cumulative_reward = []
+        self.training_steps = []
         self.greedy_steps = []
         self.greedy_cumulative_reward = []
-        self.current_episode = 0
+        
+        print(f"\n{'='*60}")
+        print(f"Training Started - Total Episodes: {self.episodes}")
+        print(f"{'='*60}\n")
         
         if run_greedy_frequency:
             for episode in range(self.episodes):
                 steps, episode_reward = self.run_episode(is_train=True, is_greedy=False)
                 self.training_steps.append(steps)
                 self.training_cumulative_reward.append(episode_reward)
+                
+                if episode > 0 and episode % max(1, self.episodes // 10) == 0:
+                    recent_window = min(len(self.training_steps), 10)
+                    avg_steps = np.mean(self.training_steps[-recent_window:])
+                    avg_reward = np.mean(self.training_cumulative_reward[-recent_window:])
+                    print(f"Episode {episode:4d} [Train] - Steps: {steps:4d}, Reward: {episode_reward:8.2f} | Avg(10): Steps={avg_steps:6.1f}, Reward={avg_reward:8.2f}")
+                
                 if (episode % run_greedy_frequency) == 0:
                     greedy_steps, greedy_reward = self.run_episode(is_train=False, is_greedy=True)
                     self.greedy_steps.append(greedy_steps)
                     self.greedy_cumulative_reward.append(greedy_reward)
+                    print(f"Episode {episode:4d} [Greedy] - Steps: {greedy_steps:4d}, Reward: {greedy_reward:8.2f}")
+                
                 if q_error_callback and (episode < 2000 or episode % 100 == 0):
                     q_error_callback(self, episode)
         else:
@@ -268,10 +340,12 @@ class TensorEfficientQL:
                 steps, episode_reward = self.run_episode(is_train=True, is_greedy=False)
                 self.training_steps.append(steps)
                 self.training_cumulative_reward.append(episode_reward)
-                if q_error_callback and (episode < 2000 or episode % 100 == 0):
-                    q_error_callback(self, episode)
-
-        self.evaluate_final_policy()
+                
+                if episode > 0 and episode % max(1, self.episodes // 10) == 0:
+                    recent_window = min(len(self.training_steps), 10)
+                    avg_steps = np.mean(self.training_steps[-recent_window:])
+                    avg_reward = np.mean(self.training_cumulative_reward[-recent_window:])
+                    print(f"Episode {episode:4d} - Steps: {steps:4d}, Reward: {episode_reward:8.2f} | Avg(10): Steps={avg_steps:6.1f}, Reward={avg_reward:8.2f}")
 
     def evaluate_final_policy(self):
         rewards = []
@@ -305,18 +379,18 @@ class TensorEfficientQL:
             'N': convert_to_list(self.N),
             'N_total': convert_to_list(self.N_total)
         }
-        import os
-        os.makedirs(os.path.dirname(filepath), exist_ok=True)
-        import json
-        with open(filepath, 'w') as f:
-            json.dump(policy_data, f)
+        np.savez(filepath, **policy_data)
+
+    def convert_to_list(self, arr):
+        if isinstance(arr, np.ndarray):
+            return arr.tolist()
+        return arr
 
     def load_policy(self, filepath):
-        import json
-        import numpy as np
-        with open(filepath, 'r') as f:
-            policy_data = json.load(f)
+        policy_data = np.load(filepath, allow_pickle=True)
         self.factors = [np.array(factor) for factor in policy_data['factors']]
+        self.factor_indices = np.arange(len(self.factors))
+        self.non_factor_indices = [np.delete(self.factor_indices, i).tolist() for i in self.factor_indices]
         if 'Q_error' in policy_data:
             self.Q_error = np.array(policy_data['Q_error'])
         else:
@@ -333,19 +407,7 @@ class TensorEfficientQL:
     def evaluate_policy(self, num_episodes=10):
         total_rewards = []
         for episode in range(num_episodes):
-            state = self.env.reset()
-            if isinstance(state, tuple):
-                state = state[0]
-            episode_reward = 0
-            for step in range(self.max_steps):
-                action = self.get_greedy_action(state)
-                next_state, reward, done, info = self.env.step(action)
-                if isinstance(info, dict) and 'terminal_observation' in info:
-                    done = done[0] if isinstance(done, tuple) else done
-                episode_reward += reward
-                state = next_state
-                if done:
-                    break
+            _, episode_reward = self.run_episode(is_train=False, is_greedy=True)
             total_rewards.append(episode_reward)
         return {
             'mean_reward': np.mean(total_rewards),
@@ -384,34 +446,20 @@ class TensorEfficientQL:
                     self.env.close()
                 except:
                     pass
-        states = np.array(state_history)
-        actions = np.array(action_history)
-        rewards = np.array(reward_history)
-        if states.shape[1] == 2:
-            angles = states[:, 0]
-            angular_velocities = states[:, 1]
-        elif states.shape[1] == 3:
-            angles = np.arctan2(states[:, 1], states[:, 0])
-            angular_velocities = states[:, 2]
-        else:
-            raise ValueError(f"Unexpected state shape: {states.shape}")
         return {
-            'angles': angles,
-            'angular_velocities': angular_velocities,
-            'actions': actions,
-            'rewards': rewards,
-            'states': states
+            'states': np.array(state_history),
+            'actions': np.array(action_history),
+            'rewards': np.array(reward_history)
         }
 
     def plot_behavior(self, behavior_data):
-        time_steps = np.arange(len(behavior_data['angles']))
-        fig, axes = plt.subplots(4, 1, figsize=(12, 10))
-        fig.suptitle('Pendulum Behavior Analysis')
-        axes[0].plot(time_steps, behavior_data['angles'] * 180 / np.pi)
-        axes[0].set_ylabel('Angle (degrees)')
+        fig, axes = plt.subplots(4, 1, figsize=(10, 12), sharex=True)
+        time_steps = np.arange(len(behavior_data['rewards']))
+        axes[0].plot(time_steps, behavior_data['states'][:, 0])
+        axes[0].set_ylabel('Inventory Level')
         axes[0].grid(True)
-        axes[1].plot(time_steps, behavior_data['angular_velocities'])
-        axes[1].set_ylabel('Angular Velocity')
+        axes[1].plot(time_steps, behavior_data['states'][:, 1])
+        axes[1].set_ylabel('Demand')
         axes[1].grid(True)
         axes[2].plot(time_steps, behavior_data['actions'])
         axes[2].set_ylabel('Action')
@@ -422,4 +470,3 @@ class TensorEfficientQL:
         axes[3].grid(True)
         plt.tight_layout()
         return fig
-

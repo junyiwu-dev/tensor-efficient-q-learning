@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 torch.set_num_threads(1)
 
 class TensorLowRankLearning:
+    
     def __init__(
         self,
         env,
@@ -52,21 +53,31 @@ class TensorLowRankLearning:
         self.state_history = []
 
     def get_random_action(self):
-        return np.random.uniform(self.discretizer.min_points_actions, self.discretizer.max_points_actions)
+        """âœ… ä¿®å¤ï¼šç›´æŽ¥ä½¿ç”¨çŽ¯å¢ƒçš„action_space"""
+        return self.env.action_space.sample()
 
     def get_greedy_action(self, state):
+        """âœ… ä¿®å¤ï¼šæ·»åŠ discrete_actionå¤„ç†"""
         state_idx = self.discretizer.get_state_index(state)
         q_simplified = self.get_q_from_state_idx(state_idx).reshape(self.discretizer.n_actions)
         action_idx = np.unravel_index(np.argmax(q_simplified), q_simplified.shape)
+        
+        # âœ… å…³é”®ä¿®å¤ï¼šæ£€æŸ¥æ˜¯å¦ä¸ºç¦»æ•£åŠ¨ä½œ
+        if self.discretizer.discrete_action:
+            return action_idx[0]
         return self.discretizer.get_action_from_index(action_idx)
 
     def get_q_from_state_idx(self, state_idx):
+        """âœ… ä¿®å¤ï¼šä½¿ç”¨æ­£ç¡®çš„Khatri-Raoè®¡ç®—"""
         state_value = np.ones(self.k)
         for idx, factor in enumerate(self.factors[:len(state_idx)]):
-            factor_row = factor[state_idx[idx], :]
-            state_value *= factor_row
-        action_khatri = tl.tenalg.khatri_rao(self.factors[len(state_idx):])
-        action_state = np.dot(state_value, action_khatri.T)
+            state_value *= factor[state_idx[idx], :]
+        
+        # âœ… å…³é”®ä¿®å¤1ï¼šæ·»åŠ reverse=Falseå‚æ•°
+        action_khatri = tl.tenalg.khatri_rao(self.factors[len(state_idx):], reverse=False)
+        
+        # âœ… å…³é”®ä¿®å¤2ï¼šä½¿ç”¨æ­£ç¡®çš„çŸ©é˜µè¿ç®—
+        action_state = np.sum(state_value * action_khatri, axis=1)
         return action_state
 
     def get_q_from_state_action_idx(self, state_idx, action_idx):
@@ -78,10 +89,8 @@ class TensorLowRankLearning:
 
     def choose_action(self, state):
         if np.random.rand() < self.epsilon:
-            action = self.get_random_action()
-        else:
-            action = self.get_greedy_action(state)
-        return action
+            return self.get_random_action()
+        return self.get_greedy_action(state)
 
     def normalize(self):
         n_factors = len(self.factors)
@@ -103,7 +112,6 @@ class TensorLowRankLearning:
         target_q = reward + self.gamma * q_next
 
         q_before = self.get_q_from_state_action_idx(state_idx, action_idx)
-
         error_signal = target_q - q_before
         tensor_indices = state_idx + action_idx
 
@@ -116,6 +124,8 @@ class TensorLowRankLearning:
             new_factors[factor_idx][tensor_indices[factor_idx], :] -= self.alpha * update
         
         self.factors = new_factors
+        if self.normalize_columns:
+            self.normalize()
 
         q_after = self.get_q_from_state_action_idx(state_idx, action_idx)
         self.Q_error[tensor_indices] = q_before - q_after
@@ -142,6 +152,9 @@ class TensorLowRankLearning:
             if isinstance(info, dict) and 'terminal_observation' in info:
                 done = done[0] if isinstance(done, tuple) else done
 
+            # Convert reward to scalar if it's an array (for Pendulum compatibility)
+            if isinstance(reward, np.ndarray):
+                reward = float(reward.item()) if reward.size == 1 else float(reward)
             cumulative_reward += reward
             if len(state_prime.shape) > 1:
                 state_prime = state_prime.flatten()
@@ -183,15 +196,27 @@ class TensorLowRankLearning:
         self.greedy_steps = []
         self.greedy_cumulative_reward = []
         
-        if (run_greedy_frequency):
+        print(f"\n{'='*60}")
+        print(f"Training Started - Total Episodes: {self.episodes}")
+        print(f"{'='*60}\n")
+        
+        if run_greedy_frequency:
             for episode in range(self.episodes):
                 steps, episode_reward = self.run_episode(is_train=True, is_greedy=False)
                 self.training_steps.append(steps)
                 self.training_cumulative_reward.append(episode_reward)
+                
+                if episode % 10 == 0 or episode < 5:
+                    avg_steps = np.mean(self.training_steps[-10:]) if len(self.training_steps) >= 10 else np.mean(self.training_steps)
+                    avg_reward = np.mean(self.training_cumulative_reward[-10:]) if len(self.training_cumulative_reward) >= 10 else np.mean(self.training_cumulative_reward)
+                    # print(f"Episode {episode:4d} [Train] - Steps: {steps:4d}, Reward: {episode_reward:8.2f} | Avg(10): Steps={avg_steps:6.1f}, Reward={avg_reward:8.2f}")
+                
                 if (episode % run_greedy_frequency) == 0:
                     greedy_steps, greedy_reward = self.run_episode(is_train=False, is_greedy=True)
                     self.greedy_steps.append(greedy_steps)
                     self.greedy_cumulative_reward.append(greedy_reward)
+                    print(f"Episode {episode:4d} [Greedy] - Steps: {greedy_steps:4d}, Reward: {greedy_reward:8.2f}")
+                
                 if q_error_callback and (episode < 2000 or episode % 100 == 0):
                     q_error_callback(self, episode)
         else:
@@ -277,74 +302,3 @@ class TensorLowRankLearning:
             'std_reward': np.std(total_rewards),
             'rewards': total_rewards
         }
-
-    def visualize_policy_behavior(self, num_steps=1000, render=False):
-        state = self.env.reset()
-        if isinstance(state, tuple):
-            state = state[0]
-        state_history = []
-        action_history = []
-        reward_history = []
-        try:
-            for step in range(num_steps):
-                if render and hasattr(self.env, 'render'):
-                    try:
-                        self.env.render()
-                    except Exception as e:
-                        print(f"Warning: Render failed: {e}")
-                        render = False
-                state_history.append(np.copy(state))
-                action = self.get_greedy_action(state)
-                action_history.append(action)
-                next_state, reward, done, info = self.env.step(action)
-                if isinstance(info, dict) and 'terminal_observation' in info:
-                    done = done[0] if isinstance(done, tuple) else done
-                reward_history.append(reward)
-                state = next_state
-                if done:
-                    break
-        finally:
-            if render and hasattr(self.env, 'close'):
-                try:
-                    self.env.close()
-                except:
-                    pass
-        states = np.array(state_history)
-        actions = np.array(action_history)
-        rewards = np.array(reward_history)
-        if states.shape[1] == 2:
-            angles = states[:, 0]
-            angular_velocities = states[:, 1]
-        elif states.shape[1] == 3:
-            angles = np.arctan2(states[:, 1], states[:, 0])
-            angular_velocities = states[:, 2]
-        else:
-            raise ValueError(f"Unexpected state shape: {states.shape}")
-        return {
-            'angles': angles,
-            'angular_velocities': angular_velocities,
-            'actions': actions,
-            'rewards': rewards,
-            'states': states
-        }
-
-    def plot_behavior(self, behavior_data):
-        time_steps = np.arange(len(behavior_data['angles']))
-        fig, axes = plt.subplots(4, 1, figsize=(12, 10))
-        fig.suptitle('Pendulum Behavior Analysis')
-        axes[0].plot(time_steps, behavior_data['angles'] * 180 / np.pi)
-        axes[0].set_ylabel('Angle (degrees)')
-        axes[0].grid(True)
-        axes[1].plot(time_steps, behavior_data['angular_velocities'])
-        axes[1].set_ylabel('Angular Velocity')
-        axes[1].grid(True)
-        axes[2].plot(time_steps, behavior_data['actions'])
-        axes[2].set_ylabel('Action')
-        axes[2].grid(True)
-        axes[3].plot(time_steps, behavior_data['rewards'])
-        axes[3].set_ylabel('Reward')
-        axes[3].set_xlabel('Time Steps')
-        axes[3].grid(True)
-        plt.tight_layout()
-        return fig
-
