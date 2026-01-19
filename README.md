@@ -87,10 +87,6 @@ python plot_baselines.py --env cartpole pendulum --model teql tlr lora-vi dqn sa
 
 **Output:** `figures/comparison_all_algorithms.pdf`
 
-**Estimated Time:** 
-- Quick version (5 iterations): ~2 hours
-- Full version (100 iterations): ~10 hours
-
 ---
 
 ### Figure 3: Ablation Study (Effect of λ Regularization)
@@ -109,8 +105,6 @@ python ablation.py
 **Output:** 
 - `figures/ablation_curves.pdf` - Learning curves
 - `figures/ablation_boxplot.pdf` - Final performance distribution
-
-**Estimated Time:** ~4 hours
 
 ---
 
@@ -134,8 +128,6 @@ python plot_sensitivity_tlr_vs_teql.py
 **Output:**
 - `figures/sensitivity_analysis.pdf` - TEQL across discretization levels
 - `figures/sensitivity_tlr_vs_teql.pdf` - TLR vs TEQL comparison
-
-**Estimated Time:** ~8 hours
 
 ---
 
