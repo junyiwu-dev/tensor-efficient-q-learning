@@ -78,8 +78,8 @@ pip install highway-env
 
 **Commands:**
 ```bash
-# Full reproduction (30 iterations, ~10 hours)
-python main_comparison.py --env cartpole pendulum --model teql tlr lora-vi dqn sac --iterations 30
+# Full reproduction (100 iterations, ~10 hours)
+python main_comparison.py --env cartpole pendulum --model teql tlr lora-vi dqn sac --iterations 100
 
 # Generate plot
 python plot_baselines.py --env cartpole pendulum --model teql tlr lora-vi dqn sac
@@ -89,7 +89,7 @@ python plot_baselines.py --env cartpole pendulum --model teql tlr lora-vi dqn sa
 
 **Estimated Time:** 
 - Quick version (5 iterations): ~2 hours
-- Full version (30 iterations): ~10 hours
+- Full version (100 iterations): ~10 hours
 
 ---
 
@@ -100,7 +100,7 @@ python plot_baselines.py --env cartpole pendulum --model teql tlr lora-vi dqn sa
 **Commands:**
 ```bash
 # Run ablation experiments
-python main_comparison.py --env cartpole pendulum --model teql --iterations 30
+python main_comparison.py --env cartpole pendulum --model teql --iterations 100
 
 # Generate ablation plots
 python ablation.py
@@ -121,10 +121,10 @@ python ablation.py
 **Commands:**
 ```bash
 # Run TEQL sensitivity analysis
-python sensitivity_analysis.py --env cartpole pendulum --iterations 30
+python sensitivity_analysis.py --env cartpole pendulum --iterations 100
 
 # Run TLR sensitivity analysis (for comparison)
-python sensitivity_analysis_TLR.py --env cartpole pendulum --iterations 30
+python sensitivity_analysis_TLR.py --env cartpole pendulum --iterations 100
 
 # Generate sensitivity plots
 python plot_sensitivity.py --env cartpole pendulum
